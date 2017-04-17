@@ -1,4 +1,10 @@
 
+"""
+Author: Andrew Chatman
+Last updated: 2017-04-17
+"""
+
+
 #Constant. Please don't change.
 G = 6.67 * (10 ** -11);
 
@@ -13,7 +19,10 @@ class DimensionException(Exception):
 
 
 
-
+"""
+Represents a body with mass which can interact 
+gravitationally with other bodies.
+"""
 class Body(object):
   
   """
@@ -128,3 +137,4 @@ class Body(object):
   def getKineticEnergy(self):
     energy = .5 * self.mass * (getVelMag(self)**2)
     return energy
+  
