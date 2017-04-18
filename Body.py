@@ -6,9 +6,10 @@ Last updated: 2017-04-17
 
 import numpy as np
 import matplotlib.pyplot as plt
-import matplotlib.animation as ani
-import mpl_toolkits.mplot3d.axes3d as p3
-
+import matplotlib.animation as animation
+from mpl_toolkits.mplot3d import Axes3D
+from random import randint
+import math
 
 #Constant. Please don't change.
 G = 1; #6.67 * (10 ** -11);
@@ -64,6 +65,7 @@ class Body(object):
       self.pos = [0,0,0]
       self.vel = [0,0,0]
       self.acc = [0,0,0]
+      self.force = [0,0,0]
     else:
       while len(self.pos) < ndim:
         self.pos.append(0)
@@ -71,6 +73,8 @@ class Body(object):
         self.vel.append(0)
       while len(self.acc) < ndim:
         self.acc.append(0)
+      while len(self.force) < ndim:
+        self.force.append(0)
 
   def __str__(self):
     return "Mass = %s, Position = %s"%(self.mass,self.pos)
@@ -129,8 +133,8 @@ class Body(object):
       raise DimensionException("The dimensionalities of two bodies must be equal to calculate a distance.")
     distSq = 0;
     for i in range(0,len(self.pos)):
-      distSq += self.pos[i] * other.pos[i]
-    return sqrt(distSq)
+      distSq += (self.pos[i] - other.pos[i])**2
+    return math.sqrt(distSq)
   
   """
   Returns the vectorial distance between this body and other.
@@ -149,8 +153,8 @@ class Body(object):
   force between this body and other.
   """
   def getGravForce(self, other):
-    distVec = getDistance(self,other)
-    distMag = getDistanceMag(self,other)
+    distVec = self.getDistance(other)
+    distMag = self.getDistanceMag(other)
     force = (G * self.mass * other.mass) / (distMag ** 2)
     distUnitVec = []
     forceVec = []
@@ -164,7 +168,7 @@ class Body(object):
   this body and other.
   """
   def getGravPotentialEnergy(self, other):
-    energy = (G * self.mass * other.mass) / getDistanceMag(self,other)
+    energy = (G * self.mass * other.mass) / self.getDistanceMag(other)
     return energy
   
   """
@@ -172,21 +176,21 @@ class Body(object):
   at the position of this body.
   """
   def getGravPotential(self, other):
-    pot = (G * other.mass) / getDistanceMag(self,other)
+    pot = (G * other.mass) / self.getDistanceMag(other)
     return pot
   
   """
   Returns the kinetic energy of this body.
   """
   def getKineticEnergy(self):
-    energy = .5 * self.mass * (getVelMag(self)**2)
+    energy = .5 * self.mass * (self.getVelMag()**2)
     return energy
   
   """
   Adds the given force to the current force on this body.
   """
   def addForce(self, f):
-    if(len(f) != len(pos)):
+    if(len(f) != len(self.pos)):
       raise DimensionException("The dimensionality of the given force must be the same as the body on which it acts.")
     for i in range(0,len(f)):
       self.force[i] += f[i]
@@ -244,29 +248,58 @@ class System(object):
       
     out = []
     for g in self.particles:
-      out.append(g.pos)
-      
-  def sim(self, steps, dt):
-    fig = plt.figure()
-    ax = p3.Axes3D(fig)
-    
-    ax.set_xlim3d([0.0,1.0])
-    ax.set_xlabel('X')
-    
-    ax.set_ylim3d([0.0,1.0])
-    ax.set_ylabel('Y')
-    
-    ax.set_zlim3d([0.0,1.0])
-    ax.set_zlim3d('Z')
-    
-    ax.set_title('N-Body Simulation')
-
+      out.append(np.asarray(g.pos))
+    return np.asarray(out)
 
 
 #EXECUTION SCRIPT
 
-sys = System(2)
-sys.addBody(2,[1,2])
-sys.addBody(4,[4,3])
-sys.addBody(3,[6,5])
-print(sys)
+#Make system
+N = int(input("Number of particles: "))
+n_frames = int(input("Step Number: "))
+sys = System(3)
+for i in range(N):
+  pos = [randint(1,20),randint(1,20),randint(1,20)]
+  mass = randint(5,10)
+  sys.addBody(mass,pos)
+
+with open("system.log", mode = 'w') as w:
+  w.write(str(sys))
+
+rt = []
+for t in range(n_frames):
+  rt.append(sys.step(.1))
+rt = np.asarray(rt)
+
+#Make plot
+fig = plt.figure()
+ax = fig.add_axes([0,0,1,1], projection = '3d')
+plt.style.use('ggplot')
+
+ax.set_xlim(-100,100)
+ax.set_xlabel('X')
+ax.set_ylim(-100,100)
+ax.set_ylabel('Y')
+ax.set_zlim(-100,100)
+ax.set_zlabel('Z')
+ax.tick_params(axis = 'both', bottom = 'off', top = 'off', right = 'off', left = 'off',
+               labelbottom = 'off', labeltop = 'off', labelright = 'off', labelleft = 'off')
+
+pts = sum([ax.plot([], [], [], 'bo') for n in range(len(sys.particles))], [])
+
+def init():
+  for pt in pts:
+    pt.set_data([], [])
+    pt.set_3d_properties([])
+  return pts
+
+def animate(i):
+  for r, pt in zip(rt[i], pts):
+    pt.set_data(r[0], r[1])
+    pt.set_3d_properties(r[2])
+  
+  fig.canvas.draw()
+  return pts
+
+anim = animation.FuncAnimation(fig, animate, init_func = init, frames = n_frames, interval = 20, blit = True)
+plt.show()
