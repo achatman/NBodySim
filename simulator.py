@@ -4,6 +4,7 @@ Author: Miles Lucas
 import numpy as np
 import matplotlib.pyplot as plt
 from mpl_toolkits.mplot3d import Axes3D
+from matplotlib import animation
 
 class Particle(object):
 
@@ -40,37 +41,57 @@ class System(object):
                     a += b.potential(b2)
             b.update(a, dt)
 
-    def run(self, time, dt):
-        fig = plt.figure()
-        ax = Axes3D(fig)
-        plt.style.use('classic')
-        for i in range(time*60):
-            # All for setting up axis
-            ax.set_xlim(-10, 10)
-            ax.set_xlabel('X')
-            ax.set_ylim(-10, 10)
-            ax.set_ylabel('Y')
-            ax.set_zlim(-10, 10)
-            ax.set_zlabel('Z')
-            ax.tick_params(axis='both', bottom='off', top='off', right='off', left='off',
-                labelbottom='off', labeltop='off', labelright='off', labelleft='off')
-
-            #The actual money
-            sys.update(dt)
-            for b in sys.bodies:
-                ax.scatter(b.r[0], b.r[1], b.r[2], 'b')
-            #60 fps
-            plt.pause(1/60)
-            plt.cla()
+    def unpack(self):
+        r = []
+        for b in self.bodies:
+            r.append(b.r)
+        return np.array(r)
 
 #-------------------------------------------------------------------------------
-
+N = 100
 # Driver Script
 p = []
-for i in range(10):
-    pos = (np.random.rand(3)-0.5)*8
-    vel = (np.random.rand(3)-0.5)*.5
+for i in range(N):
+    pos = (np.random.rand(3)-0.5)*10
+    # vel = (np.random.rand(3)-0.5)*.5
+    vel = np.zeros(3)
     p.append(Particle(pos, vel))
 
 sys = System(p)
-sys.run(5, .1)
+
+
+#-------------------------------------------------------------------------------
+# Animation
+
+fig = plt.figure()
+ax = fig.add_axes([0, 0, 1, 1], projection='3d')
+plt.style.use('classic')
+# All for setting up axis
+ax.set_xlim(-10, 10)
+ax.set_xlabel('X')
+ax.set_ylim(-10, 10)
+ax.set_ylabel('Y')
+ax.set_zlim(-10, 10)
+ax.set_zlabel('Z')
+ax.tick_params(axis='both', bottom='off', top='off', right='off', left='off',
+    labelbottom='off', labeltop='off', labelright='off', labelleft='off')
+
+pts = sum([ax.plot([], [], [], 'bo') for n in range(N)], [])
+
+def init():
+    for pt in pts:
+        pt.set_data([], [])
+        pt.set_3d_properties([])
+    return pts
+
+def animate(i):
+    sys.update(.1)
+    for r, pt in zip(sys.unpack(), pts):
+        pt.set_data(r[0], r[1])
+        pt.set_3d_properties(r[2])
+
+    fig.canvas.draw()
+    return pts
+
+anim = animation.FuncAnimation(fig, animate, init_func=init, frames=100, interval=20, blit=True)
+plt.show()
