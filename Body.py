@@ -103,7 +103,7 @@ class Body(object):
     squares = 0
     for g in pos:
       squares += g**2
-    return sqrt(squares)
+    return math.sqrt(squares)
   
   """
   Returns the magnitude of this body's velocity.
@@ -112,7 +112,7 @@ class Body(object):
     sq = 0
     for g in self.vel:
       sq += g*g
-    return sqrt(sq)
+    return math.sqrt(sq)
   
   """
   Returns the magnitude of this body's acceleration.
@@ -121,7 +121,7 @@ class Body(object):
     sq = 0
     for g in self.acc:
       sq += g*g
-    return sqrt(sq)
+    return math.sqrt(sq)
   
   """
   Returns the distance between this body and other.
@@ -200,6 +200,12 @@ class Body(object):
   current force. "Consumes" the current force.
   """
   def step(self, dt):
+    central = True
+    for g in self.pos:
+      if g != 0:
+        central = False
+    if central:
+      return
     ndim = len(self.pos)
     for i in range(0,ndim):
       self.pos[i] += self.vel[i] * dt
@@ -219,10 +225,16 @@ class System(object):
     self.ndim = d
     self.particles = []
 
-  def addBody(self, mass, pos):
+  def addBody(self, mass, pos, vel = [], acc = []):
     if(len(pos) != self.ndim):
       raise DimensionException("The position of the particles must be of the same dimensionality as the system.")
-    self.particles.append(Body(mass,position = pos))
+    if len(vel) == 0:
+      while len(vel) < len(pos):
+        vel.append(0)
+    if len(acc) == 0:
+      while len(acc) < len(pos):
+        acc.append(0)
+    self.particles.append(Body(mass,position = pos, velocity  = vel, acceleration = acc))
   
   def __str__(self):
     out = ""
@@ -254,21 +266,55 @@ class System(object):
 
 #EXECUTION SCRIPT
 
+def getColor(num):
+  chars = "0123456789abcdef"
+  red = 200
+  redness = 256 * num / red
+  blueness = 256 - redness
+  red1 = redness / 16
+  red2 = redness % 16
+  blue1 = blueness / 16
+  blue2 = blueness % 16
+  outstr = chars[red1] + chars[red2]    \
+  + "00"                                \
+  + chars[blue1] + chars[blue2]
+  return outstr
+
 #Make system
+"""
 N = int(input("Number of particles: "))
 n_frames = int(input("Step Number: "))
 sys = System(3)
+
 for i in range(N):
-  pos = [randint(1,20),randint(1,20),randint(1,20)]
-  mass = randint(5,10)
+  pos = [randint(-50,50),randint(-50,50),randint(-50,50)]
+  mass = 1
   sys.addBody(mass,pos)
+sys.addBody(100,[0,0,0])
+"""
+#Solar System
+n_frames = 200
+sys = System(3)
+sys.addBody(333000,[0,0,0])                   #Sol
+sys.addBody(.05,[.387,0,0],[0,2581,0])    #Mercury
+sys.addBody(.8,[.72,0,0],[0,645,0])    #Venus
+sys.addBody(1,[1,0,0],[0,577,0])         #Earth
+sys.addBody(.1,[1.5,0,0],[0,471,0])    #Mars
+'''
+sys.addBody(318,[5.2,0,0],[0,253,0])  #Jupiter
+sys.addBody(95,[9.5,0,0],[0,187,0])    #Saturn
+sys.addBody(14.5,[19,0,0],[0,132,0])   #Uranus
+sys.addBody(17.1,[30,0,0],[0,105,0])   #Neptune
+'''
+
+
 
 with open("system.log", mode = 'w') as w:
   w.write(str(sys))
 
 rt = []
 for t in range(n_frames):
-  rt.append(sys.step(.1))
+  rt.append(sys.step(.000001))
 rt = np.asarray(rt)
 
 #Make plot
@@ -276,11 +322,11 @@ fig = plt.figure()
 ax = fig.add_axes([0,0,1,1], projection = '3d')
 plt.style.use('ggplot')
 
-ax.set_xlim(-100,100)
+ax.set_xlim(-2,2)
 ax.set_xlabel('X')
-ax.set_ylim(-100,100)
+ax.set_ylim(-2,2)
 ax.set_ylabel('Y')
-ax.set_zlim(-100,100)
+ax.set_zlim(-2,2)
 ax.set_zlabel('Z')
 ax.tick_params(axis = 'both', bottom = 'off', top = 'off', right = 'off', left = 'off',
                labelbottom = 'off', labeltop = 'off', labelright = 'off', labelleft = 'off')
