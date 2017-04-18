@@ -4,9 +4,14 @@ Author: Andrew Chatman
 Last updated: 2017-04-17
 """
 
+import numpy as np
+import matplotlib.pyplot as plt
+import matplotlib.animation as ani
+import mpl_toolkits.mplot3d.axes3d as p3
+
 
 #Constant. Please don't change.
-G = 6.67 * (10 ** -11);
+G = 1; #6.67 * (10 ** -11);
 
 
 """
@@ -41,31 +46,51 @@ class Body(object):
   velocity, and acceleration to 0 (3D).
   Mass is given as the argument.
   """
-  def __init__(self,given_mass):
-    self.pos = [0,0,0]
-    self.vel = [0,0,0]
-    self.acc = [0,0,0]
+  def __init__(self, given_mass, **kwargs):
     self.mass = given_mass
+    self.force = []
+    self.pos = []
+    self.vel = []
+    self.acc = []
+    if "position" in kwargs:
+      self.pos = kwargs["position"]
+    if "velocity" in kwargs:
+      self.vel = kwargs["velocity"]
+    if "acceleration" in kwargs:
+      self.acc = kwargs["acceleration"]
     
-  """
-  Full constructor. Accepts all instance
-  variables as arguments. Position, velocity, and
-  acceleration should be given as lists and of the
-  same dimension. Coordinates that do not have enough
-  dimensions are padded with 0.
-  """
-  def __init__(self, pos, vel, acc, mas):
-    d = max([len(pos),len(vel),len(acc)])
-    while len(pos) < d:
-      pos.append(0)
-    while len(vel) < d:
-      vel.append(0)
-    while len(acc) < d:
-      acc.append(0)
-    self.pos = pos
-    self.vel = vel
-    self.acc = acc
-    self.mass = mas
+    ndim = max([len(self.pos),len(self.vel),len(self.acc)])
+    if ndim == 0:
+      self.pos = [0,0,0]
+      self.vel = [0,0,0]
+      self.acc = [0,0,0]
+    else:
+      while len(self.pos) < ndim:
+        self.pos.append(0)
+      while len(self.vel) < ndim:
+        self.vel.append(0)
+      while len(self.acc) < ndim:
+        self.acc.append(0)
+
+  def __str__(self):
+    return "Mass = %s, Position = %s"%(self.mass,self.pos)
+  
+  def __eq__(self,other):
+    if self.mass != other.mass:
+      return False
+    if len(self.pos) != len(other.pos):
+      return False
+    for i in range(0,len(self.pos)):
+      if self.pos[i] != other.pos[i]:
+        return False
+      if self.vel[i] != other.vel[i]:
+        return False
+      if self.acc[i] != other.acc[i]:
+        return False
+    return True
+  
+  def __ne__(self,other):
+    return not self == other
   
   """
   Returns the magnitude of the distance this body is away from the origin.
@@ -99,28 +124,47 @@ class Body(object):
   Both bodies should exist in the same dimensional
   space, else an error is thrown.
   """
-  def getDistance(self,other):
+  def getDistanceMag(self,other):
     if(len(self.pos) != len(other.pos)):
-      raise new DimensionException("The dimensionalities of two bodies must be equal to calculate a distance.")
+      raise DimensionException("The dimensionalities of two bodies must be equal to calculate a distance.")
     distSq = 0;
     for i in range(0,len(self.pos)):
       distSq += self.pos[i] * other.pos[i]
     return sqrt(distSq)
   
   """
-  Returns the magnitude of the gravitational
+  Returns the vectorial distance between this body and other.
+  Raises DimensionException if not of equal dimensionalities.
+  """
+  def getDistance(self,other):
+    if(len(self.pos) != len(other.pos)):
+      raise DimensionException("The dimensionalities of two bodies must be equal to calculate a distance.")
+    out = []
+    for i in range(0,len(self.pos)):
+      out.append(other.pos[i] - self.pos[i]);
+    return out;
+  
+  """
+  Returns the vector of the gravitational
   force between this body and other.
   """
   def getGravForce(self, other):
-    force = (G * self.mass * other.mass) / (getDistance(self,other) ** 2)
-    return force
+    distVec = getDistance(self,other)
+    distMag = getDistanceMag(self,other)
+    force = (G * self.mass * other.mass) / (distMag ** 2)
+    distUnitVec = []
+    forceVec = []
+    for i in range(0,len(distVec)):
+      distUnitVec.append(distVec[i] / distMag)
+      forceVec.append(force * distUnitVec[i])
+    return forceVec
     
   """
   Returns the gravitational potential energy between
   this body and other.
   """
   def getGravPotentialEnergy(self, other):
-    energy = (G * self.mass * other.mass) / getDistance(self,other)
+    energy = (G * self.mass * other.mass) / getDistanceMag(self,other)
     return energy
   
   """
@@ -128,7 +172,7 @@ class Body(object):
   at the position of this body.
   """
   def getGravPotential(self, other):
-    pot = (G * other.mass) / getDistance(self,other)
+    pot = (G * other.mass) / getDistanceMag(self,other)
     return pot
   
   """
@@ -138,3 +182,91 @@ class Body(object):
     energy = .5 * self.mass * (getVelMag(self)**2)
     return energy
   
+  """
+  Adds the given force to the current force on this body.
+  """
+  def addForce(self, f):
+    if(len(f) != len(pos)):
+      raise DimensionException("The dimensionality of the given force must be the same as the body on which it acts.")
+    for i in range(0,len(f)):
+      self.force[i] += f[i]
+  
+  """
+  Kinematically adjust the body's position, velocity, and acceleration based on the 
+  current force. "Consumes" the current force.
+  """
+  def step(self, dt):
+    ndim = len(self.pos)
+    for i in range(0,ndim):
+      self.pos[i] += self.vel[i] * dt
+      self.vel[i] += self.acc[i] * dt
+      self.acc[i] += self.force[i] / self.mass
+      self.force[i] = 0
+
+"""
+A model of a system of particles capable of simulating gravitational
+interactions in time steps.
+"""
+class System(object):
+  """
+  Initializes an empty system of dimension d.
+  """
+  def __init__(self,d):
+    self.ndim = d
+    self.particles = []
+
+  def addBody(self, mass, pos):
+    if(len(pos) != self.ndim):
+      raise DimensionException("The position of the particles must be of the same dimensionality as the system.")
+    self.particles.append(Body(mass,position = pos))
+  
+  def __str__(self):
+    out = ""
+    for g in self.particles:
+      out += str(g) + '\n'
+    return out
+
+  """
+  Steps the entire system over time dt.
+  Returns a list of position vectors for each particle.
+  """
+  def step(self, dt):
+    for g in self.particles:
+      force = []
+      for h in range(0,self.ndim):
+        force.append(0)
+      for h in self.particles:
+        if g != h:
+          g.addForce( g.getGravForce(h) )
+    
+    for g in self.particles:
+      g.step(dt);
+      
+    out = []
+    for g in self.particles:
+      out.append(g.pos)
+      
+  def sim(self, steps, dt):
+    fig = plt.figure()
+    ax = p3.Axes3D(fig)
+    
+    ax.set_xlim3d([0.0,1.0])
+    ax.set_xlabel('X')
+    
+    ax.set_ylim3d([0.0,1.0])
+    ax.set_ylabel('Y')
+    
+    ax.set_zlim3d([0.0,1.0])
+    ax.set_zlim3d('Z')
+    
+    ax.set_title('N-Body Simulation')
+
+
+
+#EXECUTION SCRIPT
+
+sys = System(2)
+sys.addBody(2,[1,2])
+sys.addBody(4,[4,3])
+sys.addBody(3,[6,5])
+print(sys)
