@@ -3,6 +3,7 @@ Author: Miles Lucas
 """
 import numpy as np
 import matplotlib.pyplot as plt
+from mpl_toolkits.mplot3d import Axes3D
 from matplotlib import animation
 
 class Particle(object):
@@ -16,7 +17,7 @@ class Particle(object):
         return 'Pos: '+str(self.r)+', Vel: '+str(self.v)
 
     def potential(self, other):
-        pot = -other.m * (self.r - other.r) / np.linalg.norm(self.r - other.r)**3
+        pot = other.m * (self.r - other.r) / np.linalg.norm(self.r - other.r)**3
         return pot
 
     def update(self, a, dt):
