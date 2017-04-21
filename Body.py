@@ -161,8 +161,9 @@ class Body(object):
     for i in range(0,len(distVec)):
       distUnitVec.append(distVec[i] / distMag)
       forceVec.append(force * distUnitVec[i])
+    print(str(forceVec))
     return forceVec
-    
+  
   """
   Returns the gravitational potential energy between
   this body and other.
@@ -208,7 +209,7 @@ class Body(object):
       return
     ndim = len(self.pos)
     for i in range(0,ndim):
-      self.pos[i] += self.vel[i] * dt
+      self.pos[i] += self.vel[i] * dt# + .5 * self.acc[i] * dt**2
       self.vel[i] += self.acc[i] * dt
       self.acc[i] += self.force[i] / self.mass
       self.force[i] = 0
@@ -281,7 +282,7 @@ def getColor(num):
   return outstr
 
 #Make system
-"""
+
 N = int(input("Number of particles: "))
 n_frames = int(input("Step Number: "))
 sys = System(3)
@@ -300,13 +301,11 @@ sys.addBody(.05,[.387,0,0],[0,2581,0])    #Mercury
 sys.addBody(.8,[.72,0,0],[0,645,0])    #Venus
 sys.addBody(1,[1,0,0],[0,577,0])         #Earth
 sys.addBody(.1,[1.5,0,0],[0,471,0])    #Mars
-'''
 sys.addBody(318,[5.2,0,0],[0,253,0])  #Jupiter
 sys.addBody(95,[9.5,0,0],[0,187,0])    #Saturn
 sys.addBody(14.5,[19,0,0],[0,132,0])   #Uranus
 sys.addBody(17.1,[30,0,0],[0,105,0])   #Neptune
-'''
-
+"""
 
 
 with open("system.log", mode = 'w') as w:
@@ -314,7 +313,7 @@ with open("system.log", mode = 'w') as w:
 
 rt = []
 for t in range(n_frames):
-  rt.append(sys.step(.000001))
+  rt.append(sys.step(1))
 rt = np.asarray(rt)
 
 #Make plot
@@ -322,11 +321,11 @@ fig = plt.figure()
 ax = fig.add_axes([0,0,1,1], projection = '3d')
 plt.style.use('ggplot')
 
-ax.set_xlim(-2,2)
+ax.set_xlim(-100,100)
 ax.set_xlabel('X')
-ax.set_ylim(-2,2)
+ax.set_ylim(-100,100)
 ax.set_ylabel('Y')
-ax.set_zlim(-2,2)
+ax.set_zlim(-100,100)
 ax.set_zlabel('Z')
 ax.tick_params(axis = 'both', bottom = 'off', top = 'off', right = 'off', left = 'off',
                labelbottom = 'off', labeltop = 'off', labelright = 'off', labelleft = 'off')
