@@ -3,12 +3,14 @@ Author: Andrew Chatman
 '''
 
 import numpy as np
+import matplotlib.pyplot as plt
+import matplotlib.animation as animation
+from random import randint
 
 #Constants
-G = 1
+G = 5
 
-
-class Particle(Object):
+class Particle(object):
   def __init__(self, mass = 1,
                      pos = [0,0],
                      vel = [0,0],
@@ -29,23 +31,26 @@ class Particle(Object):
   def amag(self):
     return np.linalg.norm(self.a)
   
-  #Gravitational force between self and other
+  #Gravitational force on self by other
   def gravForce(self, other):
     #vec[F] = (r/|r|) * (GMm)/(|r|^2)
     #vec[F] = (GMmr)/(|r|^3)
     #where r = r2 - r1
+    r = other.r - self.r
     
-    F = ( (G * self.m * other.m *
-             (other.r - self.r)) /
-              (np.linalg.norm(other.r - self.r)**3) )
+    if np.linalg.norm(r) <= .1:
+      return np.array([0,0])
+      
+    
+    F = G * self.m * other.m * r /(np.linalg.norm(r)**3)
     
     return F;
   #Gravitational potential energy between self and other
   def gravPotentialEnergy(self, other):
-    #U = GMm/|r|
+    #U = -GMm/|r|
     #r = r2 - r1
     
-    U = G * self.m * other.m / np.linalg.norm(other.r - self.r)
+    U = -G * self.m * other.m / np.linalg.norm(other.r - self.r)
     
     return U;
   
@@ -55,9 +60,9 @@ class Particle(Object):
     #g = GMr/|r|^3
     #r = r2 - r1
     
-    g = G * self.m * (P - self.r) / np.linalg.norm(P = self.r)**3
+    g = G * self.m * (P - self.r) / np.linalg.norm(P - self.r)**3
     
-    return g;
+    return -g;
   
   #Gravitational Potential due to self at point P
   def gravPotential(self, P):
@@ -72,7 +77,7 @@ class Particle(Object):
   def kineticEnergy(self):
     #T = .5mv^2
     
-    T = .5 * self.m * np.linalg.norm(self.v)
+    T = .5 * self.m * np.linalg.norm(self.v)**2
     
     return T;
   
@@ -84,20 +89,20 @@ class Particle(Object):
     
     return p;
   
-  #Angular momentum of self about point P
-  def angularMomentum(self, P):
-    #L = r x p
+  #Angular momentum of self about point P in the z direction
+  def angularMomentumZ(self, P):
+    #Lz = m*v*r
     #r = r_P - self.r
     
-    L = np.cross(P - self.r, self.momentum)
+    Lz = self.m * np.linalg.norm(self.v) * np.linalg.norm(P - self.r)
     
-    return L;
+    return Lz;
 
   #Applies current force to particle and updates the state variables kinematically
   def step(self, dt):
     self.r += self.v * dt + .5 * self.a * dt**2
     self.v += self.a * dt
-    self.a += self.F / self.m
+    self.a = self.F / self.m
     self.F = np.array([0,0], dtype='float64')
 
 
@@ -106,11 +111,19 @@ class System(object):
     self.particles = []
     self.time = 0
   
+  def __str__(self):
+    if len(self.particles) == 0:
+      return "Empty System"
+    out = ''
+    for g in self.particles:
+      out+= str(g) + '\n'
+    return out;
+  
   def addParticle(self, mass = 1,
                         pos = [0,0],
                         vel = [0,0],
                         acc = [0,0]):
-    self.particles.append(mass,pos,vel,acc)
+    self.particles.append(Particle(mass,pos,vel,acc))
   
   #Net gravitational force on the ith element of self.particles
   def netGravForce(self, i):
@@ -118,7 +131,7 @@ class System(object):
     this = self.particles[i]
     for g in self.particles:
       if g != this:
-        netF += this.gravForce(g)
+        netF = this.gravForce(g)
     
     return netF;
   
@@ -190,10 +203,64 @@ class System(object):
   
   def step(self, dt):
     for i, g in enumerate(self.particles):
-      g.F = self.netGravForce(i)
+      g.F += self.netGravForce(i)
     
     for g in self.particles:
-      g.step()
+      g.step(dt)
     
     self.time += dt
-      
+    out = []
+    for g in self.particles:
+      out.append(np.asarray(g.r))
+    return np.asarray(out)
+
+'''
+N = 10
+n_frames = 200
+sys = System()
+for i in range(N):
+  pos = [randint(-5,5),randint(-5,5)]
+  mass = .01
+  sys.addParticle(mass,pos)
+sys.addParticle(20,[0,0])
+'''
+n_frames = 200
+sys = System()
+sys.addParticle(20,[1,0],[0,5])
+sys.addParticle(20,[-1,0],[0,-5])
+
+with open("system.log", mode = 'w') as w:
+  w.write(str(sys))
+
+rt = []
+for t in range(n_frames):
+  rt.append(sys.step(0.01))
+rt = np.asarray(rt)
+
+#Make plot
+fig = plt.figure()
+ax = fig.add_axes([0,0,1,1])
+
+ax.set_xlim(-10,10)
+ax.set_xlabel('X')
+ax.set_ylim(-10,10)
+ax.set_ylabel('Y')
+ax.tick_params(axis = 'both', bottom = 'off', top = 'off', right = 'off', left = 'off',
+               labelbottom = 'off', labeltop = 'off', labelright = 'off', labelleft = 'off')
+
+pts = sum([ax.plot([], [], 'bo') for n in range(len(sys.particles))], [])
+
+def init():
+  for pt in pts:
+    pt.set_data([], [])
+  return pts
+
+def animate(i):
+  for r, pt in zip(rt[i], pts):
+    pt.set_data(r[0], r[1])
+  
+  fig.canvas.draw()
+  return pts
+
+anim = animation.FuncAnimation(fig, animate, init_func = init, frames = n_frames, interval = 20, blit = True)
+plt.show()
