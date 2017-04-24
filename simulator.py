@@ -49,8 +49,12 @@ class Particle(object):
   def gravPotentialEnergy(self, other):
     #U = -GMm/|r|
     #r = r2 - r1
+    r = other.r - self.r
     
-    U = -G * self.m * other.m / np.linalg.norm(other.r - self.r)
+    if np.linalg.norm(r) <= .1:
+      return 0
+    
+    U = -G * self.m * other.m / np.linalg.norm(r)
     
     return U;
   
@@ -110,6 +114,10 @@ class System(object):
   def __init__(self):
     self.particles = []
     self.time = 0
+    self.stepNum = 0
+    #clear summary.log
+    with open("summary.log", mode = 'w') as w:
+      w.write("step,t,L,H,K,U\n")
   
   def __str__(self):
     if len(self.particles) == 0:
@@ -171,9 +179,9 @@ class System(object):
   
   #Net angular momentum of the system about point P
   def netAngularMomentum(self, P):
-    netL = np.array([0,0,0], dtype='float64')
+    netL = 0
     for g in self.particles:
-      netL += g.angularMomentum(P)
+      netL += g.angularMomentumZ(P)
     
     return netL;
   
@@ -202,6 +210,13 @@ class System(object):
     return self.totalKinetic() + self.totalPotentialEnergy();
   
   def step(self, dt):
+    with open("summary.log", mode = 'a') as w:
+      w.write("%s,%s,%s,%s,%s,%s\n"%(self.stepNum, 
+                                     self.time, 
+                                     self.lagrangian(), 
+                                     self.hamiltonian(),
+                                     self.totalKinetic(),
+                                     self.totalPotentialEnergy()))
     for i, g in enumerate(self.particles):
       g.F += self.netGravForce(i)
     
@@ -209,32 +224,32 @@ class System(object):
       g.step(dt)
     
     self.time += dt
+    self.stepNum += 1
     out = []
     for g in self.particles:
       out.append(np.asarray(g.r))
     return np.asarray(out)
 
-'''
+
 N = 10
-n_frames = 200
+n_frames = 1000
 sys = System()
 for i in range(N):
   pos = [randint(-5,5),randint(-5,5)]
-  mass = .01
+  mass = .1
   sys.addParticle(mass,pos)
-sys.addParticle(20,[0,0])
 '''
 n_frames = 200
 sys = System()
 sys.addParticle(20,[1,0],[0,5])
 sys.addParticle(20,[-1,0],[0,-5])
-
+'''
 with open("system.log", mode = 'w') as w:
   w.write(str(sys))
 
 rt = []
 for t in range(n_frames):
-  rt.append(sys.step(0.01))
+  rt.append(sys.step(0.1))
 rt = np.asarray(rt)
 
 #Make plot
